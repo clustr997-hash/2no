@@ -1,62 +1,78 @@
-# Edu Notes Marketplace (Firebase MVP)
+# MicroMall Edu Cheats
 
-This repository contains an MVP starter for a digital-product marketplace focused on university notes/PYQs.
+Firebase + React marketplace for SPPU and DBATU subject documents. Students browse by university, year, branch, and subject. Admin uploads notes, PYQs, PDFs, and images, changes prices, and approves UPI payments before paid downloads unlock.
 
-## Stack
-- Firebase Hosting
-- Firebase Authentication (Google)
-- Firestore
-- Firebase Storage
-- Cloud Functions (Node.js)
+## What is included
 
-## MVP Features Included
-- Public product listing (from Firestore)
-- Google sign-in
-- Manual UPI checkout request (`pending_approval`)
-- Owner-only admin panel (toggle by admin email list)
-- Approve/reject orders
-- Purchases page for users
+- Public browse flow: SPPU FY/SY/TY/BE and DBATU FY/SY/TY/BE.
+- Branch and subject pages with shareable URLs.
+- Student login for orders and approved downloads.
+- Admin-only dashboard for subject CRUD, document upload/delete, UPI settings, and order approval/rejection.
+- Private Firebase Storage files served through callable signed URLs.
+- Manual UPI flow with GPay, PhonePe, and Paytm UI.
 
-## Project Structure
-- `web/` - Vite + React frontend
-- `functions/` - Firebase callable functions
-- `firestore.rules` - Firestore security rules
-- `storage.rules` - Storage security rules
-- `firestore.indexes.json` - Query indexes
+## Firebase integration
 
-## Quick Start
-1. Install Firebase CLI: `npm i -g firebase-tools`
-2. `firebase login`
-3. Create project and set alias: `firebase use --add`
-4. Frontend setup:
-   - `cd web && npm install`
-   - copy `.env.example` to `.env` and fill Firebase config
-5. Functions setup:
-   - `cd ../functions && npm install`
-6. Run local emulators from repo root:
-   - `firebase emulators:start`
-7. Deploy:
-   - `firebase deploy`
+1. Create a Firebase project and enable:
+   - Authentication: Google provider.
+   - Firestore Database.
+   - Storage.
+   - Cloud Functions.
+   - Hosting.
 
-## One-time Admin Setup
-Set your owner email in `web/src/config/admin.ts`.
-For production, move to custom claims and secure callable functions.
+2. Copy frontend config:
+   - In Firebase Console, open Project settings > General > Your apps > Web app.
+   - Copy the Firebase config values into `web/.env` using `web/.env.example` as the template.
 
-## Next Steps
-- Replace admin-email check with Firebase custom claims.
-- Add signed URL generation for file download.
-- Add notifications for pending orders.
-- Add watermarking for anti-sharing.
+3. Set the Firebase project locally:
+   ```bash
+   firebase login
+   firebase use --add
+   ```
 
+4. Install dependencies:
+   ```bash
+   cd web
+   npm install
+   cd ../functions
+   npm install
+   ```
 
-## Current UI Status
-- `/` has a styled landing page with category cards and checkout flow explanation.
-- `/products` shows sample product cards and pricing placeholders.
-- `/my-orders` and `/admin` are scaffold pages with clear purpose text.
-- `/remaining` lists implementation tasks still pending for production readiness.
+5. Set your admin email in `web/src/config/admin.ts` for UI visibility, then set the real Firebase admin custom claim. Example one-time script from `functions/`:
+   ```bash
+   node -e "const admin=require('firebase-admin');admin.initializeApp();admin.auth().getUserByEmail('YOUR_EMAIL@gmail.com').then(u=>admin.auth().setCustomUserClaims(u.uid,{admin:true})).then(()=>console.log('admin set'))"
+   ```
 
+6. Deploy rules, indexes, functions, and hosting:
+   ```bash
+   firebase deploy --only firestore:rules,firestore:indexes,storage:rules,functions,hosting
+   ```
 
-## Trust & UX improvements
-- Improved page structure and messaging so students clearly understand payment, approval, and access flow.
-- Added friendly sections for trust indicators, transparent pricing preview, and clear order status explanation.
-- Added an explicit roadmap page (`/remaining`) to show what is implemented vs pending.
+## Admin workflow
+
+1. Login with the admin Google account.
+2. Open `Admin`.
+3. Add subjects for SPPU/DBATU, year, branch, name, price, and paid/free status.
+4. Select a subject and upload PDFs/images as notes, PYQs, assignments, or other documents.
+5. Update payment settings with your UPI ID.
+6. Approve or reject pending student payment submissions.
+
+## Student workflow
+
+1. Open Browse and select university > year > branch > subject.
+2. Free subjects or free previews can be opened directly.
+3. Paid subjects require student login, UPI payment, transaction ID, and admin approval.
+4. After approval, the subject appears in `My Access` and downloads are unlocked.
+
+## Local development
+
+```bash
+cd web
+npm run dev
+```
+
+For Firebase emulators, run from the repo root:
+
+```bash
+firebase emulators:start
+```
