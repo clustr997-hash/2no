@@ -64,6 +64,17 @@ Firebase + React marketplace for SPPU and DBATU subject documents. Students brow
 3. Paid subjects require student login, UPI payment, transaction ID, and admin approval.
 4. After approval, the subject appears in `My Access` and downloads are unlocked.
 
+
+### Spark (free plan) mode
+
+If you stay on Spark without enabling Storage/Functions, the app now supports a simplified flow:
+
+- Admin can add documents using a **Public file URL** (Drive/Dropbox/Cloudflare R2 public link) instead of upload.
+- Downloads open `publicUrl` directly when present.
+- Admin approval/rejection can run directly from Firestore writes when callable Functions are unavailable.
+
+Tradeoffs: no signed private download links and no secure server-side approval logic.
+
 ## Local development
 
 ```bash
