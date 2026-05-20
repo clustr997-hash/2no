@@ -499,6 +499,16 @@ function SubjectDetails({ profile, settings }) {
     }
 
     try {
+      if (item.publicUrl) {
+        window.open(item.publicUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
+
+      if (!cloudFunctions) {
+        setMessage('Cloud Functions is disabled. Add a public URL on the document or upgrade to use protected downloads.');
+        return;
+      }
+
       const getDownloadUrl = httpsCallable(cloudFunctions, 'getDownloadUrl');
       const result = await getDownloadUrl({ documentId: item.id });
       window.open(result.data.url, '_blank', 'noopener,noreferrer');
@@ -715,7 +725,7 @@ function AdminDashboard({ profile, settings }) {
     active: true
   });
   const [editingSubjectId, setEditingSubjectId] = useState('');
-  const [docForm, setDocForm] = useState({ title: '', type: 'important-notes', isFreePreview: false, active: true });
+  const [docForm, setDocForm] = useState({ title: '', type: 'important-notes', publicUrl: '', isFreePreview: false, active: true });
   const [docFile, setDocFile] = useState(null);
   const [siteForm, setSiteForm] = useState(settings);
   const [message, setMessage] = useState('');
@@ -860,30 +870,50 @@ function AdminDashboard({ profile, settings }) {
       setMessage('Select a subject first.');
       return;
     }
-    if (!docFile) {
-      setMessage('Choose a PDF or image to upload.');
+    const canUploadToStorage = Boolean(storage);
+    const hasPublicUrl = Boolean(docForm.publicUrl.trim());
+
+    if (!docFile && !hasPublicUrl) {
+      setMessage('Choose a file or paste a public file URL.');
+      return;
+    }
+
+    if (docFile && !canUploadToStorage) {
+      setMessage('Storage is disabled on Spark. Use a public file URL instead of upload.');
       return;
     }
 
     try {
-      const filePath = `subject-documents/${selectedSubjectId}/${Date.now()}-${safeFileName(docFile.name)}`;
-      await uploadBytes(ref(storage, filePath), docFile, { contentType: docFile.type || 'application/octet-stream' });
+      let filePath = '';
+      let fileName = docForm.title.trim() || 'document';
+      let mimeType = '';
+      let size = 0;
+
+      if (docFile && canUploadToStorage) {
+        filePath = `subject-documents/${selectedSubjectId}/${Date.now()}-${safeFileName(docFile.name)}`;
+        await uploadBytes(ref(storage, filePath), docFile, { contentType: docFile.type || 'application/octet-stream' });
+        fileName = docFile.name;
+        mimeType = docFile.type || '';
+        size = docFile.size;
+      }
+
       await addDoc(collection(db, 'documents'), {
         subjectId: selectedSubjectId,
-        title: docForm.title.trim() || docFile.name,
+        title: docForm.title.trim() || fileName,
         type: docForm.type,
         filePath,
-        fileName: docFile.name,
-        mimeType: docFile.type || '',
-        size: docFile.size,
+        publicUrl: docForm.publicUrl.trim(),
+        fileName,
+        mimeType,
+        size,
         isFreePreview: docForm.isFreePreview,
         active: docForm.active,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
-      setDocForm({ title: '', type: 'important-notes', isFreePreview: false, active: true });
+      setDocForm({ title: '', type: 'important-notes', publicUrl: '', isFreePreview: false, active: true });
       setDocFile(null);
-      setMessage('Document uploaded.');
+      setMessage('Document saved.');
     } catch (error) {
       setMessage(error.message);
     }
@@ -946,8 +976,16 @@ function AdminDashboard({ profile, settings }) {
 
   async function approveOrder(id) {
     try {
-      const fn = httpsCallable(cloudFunctions, 'approveOrder');
-      await fn({ orderId: id });
+      if (cloudFunctions) {
+        const fn = httpsCallable(cloudFunctions, 'approveOrder');
+        await fn({ orderId: id });
+      } else {
+        await updateDoc(doc(db, 'orders', id), {
+          status: 'approved',
+          approvedAt: serverTimestamp(),
+          approvedBy: profile.user?.uid || ''
+        });
+      }
       setMessage('Order approved.');
     } catch (error) {
       setMessage(error.message);
@@ -956,8 +994,16 @@ function AdminDashboard({ profile, settings }) {
 
   async function rejectOrder(id) {
     try {
-      const fn = httpsCallable(cloudFunctions, 'rejectOrder');
-      await fn({ orderId: id });
+      if (cloudFunctions) {
+        const fn = httpsCallable(cloudFunctions, 'rejectOrder');
+        await fn({ orderId: id });
+      } else {
+        await updateDoc(doc(db, 'orders', id), {
+          status: 'rejected',
+          rejectedAt: serverTimestamp(),
+          rejectedBy: profile.user?.uid || ''
+        });
+      }
       setMessage('Order rejected.');
     } catch (error) {
       setMessage(error.message);
@@ -1078,6 +1124,10 @@ function AdminDashboard({ profile, settings }) {
             <label>
               File
               <input type="file" accept="application/pdf,image/*" onChange={(event) => setDocFile(event.target.files?.[0] || null)} />
+            </label>
+            <label>
+              Public file URL (free mode)
+              <input value={docForm.publicUrl} onChange={(event) => setDocForm({ ...docForm, publicUrl: event.target.value })} placeholder="https://..." />
             </label>
             <label className="check-row">
               <input type="checkbox" checked={docForm.isFreePreview} onChange={(event) => setDocForm({ ...docForm, isFreePreview: event.target.checked })} />
